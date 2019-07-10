@@ -8,7 +8,7 @@ const router = express.Router();
 
 const User = require('../../models/User');
 
-//@route Get api/users
+//@route Get api/auth
 router.get('/', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -27,7 +27,7 @@ router.post(
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array() });
+      return res.status(400).json({ errors: errors.array() });
     }
     const { email, password } = req.body;
     try {
@@ -36,7 +36,7 @@ router.post(
       if (!user) {
         return res
           .status(400)
-          .json({ errors: [{ mssg: 'Invalid credentials' }] });
+          .json({ errors: [{ msg: 'Invalid credentials' }] });
       }
 
       const ismatch = await bcrypt.compare(password, user.password);
@@ -44,7 +44,7 @@ router.post(
       if (!ismatch) {
         return res
           .status(400)
-          .json({ errors: [{ mssg: 'Invalid credentials' }] });
+          .json({ errors: [{ msg: 'Invalid credentials' }] });
       }
 
       const payload = {

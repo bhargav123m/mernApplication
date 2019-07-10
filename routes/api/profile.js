@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../../middleware/auth');
+const request = require('request');
+const config = require('config');
 const Profile = require('../../models/Profile');
 const User = require('../../models/User');
+const Post = require('../../models/Posts');
 const { check, validationResult } = require('express-validator');
 
 //@route Get api/profile/me
@@ -132,6 +135,7 @@ router.get('/user/:user_id', async (req, res) => {
 //@access private
 router.delete('/', auth, async (req, res) => {
   try {
+    await Post.deleteMany({ user: req.user.id });
     await Profile.findOneAndRemove({ user: req.user.id });
     await User.findOneAndRemove({ _id: req.user.id });
     res.send({ msg: 'User Removed' });
@@ -140,7 +144,7 @@ router.delete('/', auth, async (req, res) => {
   }
 });
 
-//@route Put api/profile/experience
+//@route Post api/profile/experience
 //@access private
 router.post(
   '/experience',
@@ -161,7 +165,7 @@ router.post(
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array() });
+      return res.status(400).json({ errors: errors.array() });
     }
 
     const {
@@ -194,6 +198,8 @@ router.post(
   }
 );
 
+//@route Update api/profile/experience/update/:id
+//@access private
 router.patch('/experience/update/:id', auth, async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id });
@@ -215,6 +221,8 @@ router.patch('/experience/update/:id', auth, async (req, res) => {
   }
 });
 
+//@route Delete api/profile/experience/delete/:id
+//@access private
 router.delete('/experience/delete/:id', auth, async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id });
@@ -230,8 +238,10 @@ router.delete('/experience/delete/:id', auth, async (req, res) => {
   }
 });
 
+//@route Post api/profile/education
+//@access private
 router.post(
-  '/education/add',
+  '/education',
   [
     auth,
     [
@@ -252,7 +262,7 @@ router.post(
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ error: errors.array() });
+      return res.status(400).json({ errors: errors.array() });
     }
     try {
       const profile = await Profile.findOne({ user: req.user.id });
@@ -261,13 +271,15 @@ router.post(
       }
       profile.education.unshift(req.body);
       await profile.save();
-      res.status(200).json({ msg: 'education posted' });
+      res.status(200).json(profile);
     } catch (e) {
       res.status(500).send('server error');
     }
   }
 );
 
+//@route update api/profile/education/update/:id
+//@access private
 router.patch('/education/update/:id', auth, async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id });
@@ -291,6 +303,8 @@ router.patch('/education/update/:id', auth, async (req, res) => {
   }
 });
 
+//@route Delete api/profile/education/delete/:id
+//@access private
 router.delete('/education/delete/:id', auth, async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id });
@@ -301,6 +315,36 @@ router.delete('/education/delete/:id', auth, async (req, res) => {
     });
     await profile.save();
     res.status(200).send(profile);
+  } catch (e) {
+    res.status(500).send('server error');
+  }
+});
+
+//@route Get api/profile/github/:username
+//@access public
+router.get('/github/:username', (req, res) => {
+  try {
+    const options = {
+      url:
+        'https://api.github.com/users/' +
+        req.params.username +
+        '/repos?per_page=5@sort=created:asc&client_id=' +
+        config.get('githubClientId') +
+        '&client_secret=' +
+        config.get('githubSecret'),
+      method: 'GET',
+      headers: { 'user-agent': 'node.js' }
+    };
+    request(options, (error, response, body) => {
+      if (error) {
+        console.log(error);
+      }
+
+      if (response.statusCode !== 200) {
+        return res.status(400).json({ msg: 'No Github Profile Found' });
+      }
+      res.json(JSON.parse(body));
+    });
   } catch (e) {
     res.status(500).send('server error');
   }
